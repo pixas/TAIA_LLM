@@ -1,0 +1,40 @@
+# Python
+__pycache__
+*.pyc
+*.egg-info
+dist
+
+# Log
+*.log
+*.log.*
+*.json
+*.jsonl
+
+# Data
+!**/alpaca-data-conversation.json
+!ming/eval/datasets/*.jsonl
+datas
+# Editor
+.idea
+*.swp
+
+# Other
+.DS_Store
+wandb
+output
+
+checkpoints
+ckpts*
+
+.ipynb_checkpoints
+*.ipynb
+
+playground/data
+scripts/v1_5
+logs
+!zero2.json 
+!zero3.json 
+!zero3_offload.json
+run_script.sh
+phoenix*
+batchscript*
