@@ -12,7 +12,7 @@ The comparison of TAIA with vanilla fine-tuning method on OOD data.
 * Our proposed **TAIA** as an simple-yet-effective method which can be applied in OOD fine-tuning with large language models. It can avoid the disruption of FFN memories while acquiring superior downstream improvements. ![](img/cmp_other.png)
 * **TAIA** can learn OOD features without disturbing internal knowledge. Therefore, it supports vertical task improvement via general fine-tuning data. ![](img/ood_tuning.png)
 * **TAIA** can learn OOD features without disturbing internal knowledge. Therefore, it resists red-team attacks to a promising extent. ![](img/jailbreak.png)
-* Our study achieves superb data efficiency (less data with higher performance), high representation ability (higher representation rank), and high generalization (reservation of few-shot adaptation). ![](img/highlight.png)
+* Our study achieves superb *data efficiency* (less data with higher performance), *domain generalization* (reservation of few-shot adaptation), and *high representation ability* (higher representation rank). ![](img/highlight.png)
 
 
 
@@ -26,7 +26,7 @@ pip install flash-attn --no-build-isolation
 ```
 
 ### Data Preparation
-You can download the `datas.tar.gz` from `https://huggingface.co/datasets/pixas/TAIA_data`.
+You can download the `datas.tar.gz` from https://huggingface.co/datasets/pixas/TAIA_data.
 Unzip the `datas.tar.gz` and put it as the `datas/` folder.
 
 ### Finetuning
