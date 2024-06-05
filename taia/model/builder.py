@@ -19,8 +19,8 @@ import shutil
 from copy import copy
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BitsAndBytesConfig
 import torch
-from ming.model.utils import get_mixoflora_model, get_part_mixoflora_model
-from ming.model import MoLoRAQwenForCausalLM, MoLoRALlamaForCausalLM, MoLoRAQwenDecoderLayer, MoLoRALlamaDecoderLayer
+from taia.model.utils import get_mixoflora_model, get_part_mixoflora_model
+from taia.model import MoLoRAQwenForCausalLM, MoLoRALlamaForCausalLM, MoLoRAQwenDecoderLayer, MoLoRALlamaDecoderLayer
 from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 import json

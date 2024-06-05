@@ -3,9 +3,9 @@ import torch
 import os
 import json
 from tqdm import trange
-from ming.conversations import conv_templates, SeparatorStyle
-from ming.model.builder import load_pretrained_model, load_molora_pretrained_model
-from ming.utils import get_model_name_from_path
+from taia.conversations import conv_templates, SeparatorStyle
+from taia.model.builder import load_pretrained_model, load_molora_pretrained_model
+from taia.utils import get_model_name_from_path
 
 from torch.utils.data import DataLoader
 import pandas as pd 

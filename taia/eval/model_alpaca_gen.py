@@ -1,19 +1,20 @@
 import argparse
 import torch
 import os
-import json
-from tqdm import tqdm, trange
+
+from tqdm import tqdm
 # import shortuuid
-from ming.utils import client
+from taia.utils import client
 
-from ming.conversations import conv_templates, SeparatorStyle
-from ming.model.builder import load_pretrained_model, load_molora_pretrained_model
-from ming.utils import disable_torch_init, get_model_name_from_path
+from taia.conversations import conv_templates, SeparatorStyle
+from taia.model.builder import load_pretrained_model, load_molora_pretrained_model
+from taia.utils import get_model_name_from_path
 # from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd 
+from torch.utils.data import DataLoader
 
-# from PIL import Image
+import datasets 
+from copy import deepcopy
+
 import math
 
 
@@ -44,7 +45,7 @@ class CustomDataset:
         answer = line['conversations'][1]['value'] if len(line['conversations']) > 1 else None
 
         additional_info = line['eval']
-        additional_info['id'] = line['id']
+
         
         # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt')
 
@@ -83,55 +84,24 @@ def convert_to_json(questions):
     questions = questions.to_dict(orient='records')
     return questions
 
-
-def format_self_distillation(instruction: str, original_response: str, *, template: str):
-    output = template.format(instruction=instruction,
-                             original_response=original_response)
-    return output
-
 def eval_model(args):
     # Model
     # disable_torch_init()
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
-
+    test_base = model_path is None and args.model_base is not None 
     # else:
-    if "molora" in model_path:
-        tokenizer, model, context_len, tokenizer_with_prefix_space = load_molora_pretrained_model(model_path, args.model_base, model_name, args.load_molora, use_logit_bias=args.use_logit_bias)
+    if args.load_molora:
+    # if "molora" in model_path:
+        tokenizer, model, context_len, tokenizer_with_prefix_space = load_molora_pretrained_model(model_path, args.model_base, model_name, args.load_molora, use_logit_bias=args.use_logit_bias, add_layer_index=args.add_layer_index, ada_output_molora=args.ada_output_molora, unload_lora=args.unload_lora)
     else:
-        tokenizer, model, context_len, tokenizer_with_prefix_space = load_pretrained_model(model_path, args.model_base, model_name, use_logit_bias=args.use_logit_bias)
+        tokenizer, model, context_len, tokenizer_with_prefix_space = load_pretrained_model(model_path, args.model_base, model_name, use_logit_bias=args.use_logit_bias, unload_ffn=args.unload_ffn)
 
     # load args.question_file, which is a csv file
-    if args.question_file.endswith(".csv"):
-        questions = pd.read_csv(os.path.expanduser(args.question_file))
-        questions = convert_to_json(questions) 
-    elif args.question_file.endswith(".jsonl"):
-        questions = client.read_jsonl(os.path.expanduser(args.question_file))
-    else:
-        # a json file
-        questions = client.read_json(os.path.expanduser(args.question_file))
-
-    questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
+    
     
 
     answers_file = os.path.expanduser(args.answers_file)
-    # os.makedirs(os.path.dirname(answers_file), exist_ok=True)
-    
-    if args.resume:
-        current_file_num = 0
-        if client.exists(answers_file):
-        # if os.path.exists(answers_file):
-            data = client.read_jsonl(answers_file)
-            current_file_num = len(data)
-            # with open(answers_file, 'r') as f:
-            #     for line in f:
-            #         current_file_num += 1
-            questions = questions[current_file_num:]
-            ans_file = open(answers_file, "a", encoding='utf-8')
-        else:
-            ans_file = open(answers_file, "w", encoding='utf-8')
-    else:
-        ans_file = open(answers_file, "w", encoding='utf-8')
 
     if 'plain' in model_name and 'finetune' not in model_name.lower() and 'mmtag' not in args.conv_mode:
         args.conv_mode = args.conv_mode + '_mmtag'
@@ -139,50 +109,50 @@ def eval_model(args):
 
     # data_loader = create_data_loader(questions, tokenizer, model.config)
     model: torch.nn.Module
+    model.eval()
     sequence_bias = None
     def get_tokens_as_tuple(word):
         return tuple(tokenizer_with_prefix_space([word], add_special_tokens=False).input_ids[0])
-    # for name, layer in model.named_modules():
-    #     layer.__name__ = name
-    #     if "gate_proj" in name:
-    #         layer.register_forward_hook(
-    #             lambda layer, input, output: print(f"{layer.__name__}: {input[0].shape} {output.shape}")
-    #         )
-    #         # print(f"register {layer.__name__} hook")
-    #         break
-    max_new_tokens = 2048
 
-    dataset = CustomDataset(questions)
-    with open(args.template_path, "r", encoding='utf-8') as f:    
-        template_words = f.read()
+    max_new_tokens = args.max_tokens
     
-    for idx in trange(len(dataset), desc="Distilling the dataset"):
-    # for idx in trange(10):
-        line = dataset[idx]
+    dataset = datasets.load_dataset("tatsu-lab/alpaca_eval", "alpaca_eval")["eval"]
+    new_dataset = []
+    for example in tqdm(dataset):
 
-
-        question, answer, additional_info = line
-        # question = question + task_specific_prompt
-        cur_prompt = format_self_distillation(question, answer, template=template_words)
+        cur_prompt = example['instruction']
         
 
         conv = conv_templates[args.conv_mode].copy()
         conv.append_message(conv.roles[0], cur_prompt)
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
+
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids
         
-        stop_str = conv_templates[args.conv_mode].sep if conv_templates[args.conv_mode].sep_style != SeparatorStyle.TWO else conv_templates[args.conv_mode].sep2
+        stop_str = conv_templates[args.conv_mode].sep2 if conv_templates[args.conv_mode].sep_style != SeparatorStyle.LLAMA_3 else conv_templates[args.conv_mode].stop_str
         input_ids = input_ids.to(device='cuda', non_blocking=True)
+        if args.conv_mode == 'llama3':
+            terminators = [
+                tokenizer.eos_token_id,
+                tokenizer.convert_tokens_to_ids("<|eot_id|>")
+            ]
+        else:
+            terminators = tokenizer.eos_token_id
+        attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device='cuda', non_blocking=True)
         with torch.inference_mode():
             output_ids = model.generate(
                 input_ids,
                 do_sample=True if args.temperature > 0 else False,
+                attention_mask=attention_mask,
                 temperature=args.temperature,
+                eos_token_id=terminators,
+                pad_token_id=tokenizer.pad_token_id,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 max_new_tokens=max_new_tokens,
                 use_cache=True,
+                output_attentions=model.config.output_attentions,
                 sequence_bias=sequence_bias)
 
         input_token_len = input_ids.shape[1]
@@ -191,43 +161,24 @@ def eval_model(args):
             print(f'[Warning] {n_diff_input_output} output_ids are not the same as the input_ids')
         outputs = tokenizer.batch_decode(output_ids[:, input_token_len:], skip_special_tokens=True)[0]
         outputs = outputs.strip()
+        # print(outputs)
         if outputs.endswith(stop_str):
             outputs = outputs[:-len(stop_str)]
         outputs = outputs.strip()
-
-        # ans_id = shortuuid.uuid()
-        id_ = additional_info['id']
-        del additional_info['id']
-        output_dict = {
-            "id": id_,
-            'conversations': [
-                {
-                    "from": "human",
-                    "value": question
-                },
-                {
-                    "from": "gpt",
-                    "value": outputs
-                }
-            ],
-            "eval": additional_info
-        }
-
-        ans_file.write(json.dumps(output_dict, ensure_ascii=False) + "\n")
-        ans_file.flush()
         
-    ans_file.close()
-    with open(os.path.expanduser(args.answers_file), 'r') as f:
-        client.write_jsonl([x for x in f], args.s3_answers_file)
-    if not args.keep_local:
-        os.remove(os.path.expanduser(args.answers_file))
+        new_example = deepcopy(example)
+        new_example['output'] = outputs
+        new_dataset.append(new_example)
 
+
+    client.write(new_dataset, answers_file)
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-path", type=str, default="facebook/opt-350m")
     parser.add_argument("--model-base", type=str, default=None)
     parser.add_argument("--load-molora", action="store_true")
-    parser.add_argument("--template-path", type=str, default="templates/")
+    parser.add_argument("--unload-lora", action="store_true")
     parser.add_argument("--question-file", type=str, default="tables/question.jsonl")
     parser.add_argument("--answers-file", type=str, default="answer.jsonl")
     parser.add_argument("--s3-answers-file", type=str, default="s3://syj_test/answer.jsonl")
@@ -239,8 +190,13 @@ if __name__ == "__main__":
     parser.add_argument("--num-chunks", type=int, default=1)
     parser.add_argument("--chunk-idx", type=int, default=0)
     parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--top_p", type=float, default=None)
     parser.add_argument("--num_beams", type=int, default=1)
+    parser.add_argument("--ada-output-molora", action="store_true")
+    parser.add_argument("--add-layer-index", type=int, default=0)
+    parser.add_argument("--infer-answer", action="store_true")
+    parser.add_argument("--unload-ffn", action="store_true")
     args = parser.parse_args()
 
     eval_model(args)

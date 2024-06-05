@@ -1,8 +1,8 @@
 import os 
 import json
 import argparse 
-from ming.utils import client
-from ming.eval.eval_em import METRIC_FUNC_MAPPING
+from taia.utils import client
+from taia.eval.eval_em import METRIC_FUNC_MAPPING
 from typing import List, Any
 from transformers import AutoTokenizer
 

@@ -7,7 +7,7 @@
 
 # replace_llama_attn_with_flash_attn()
 
-from ming.train.train import train
+from taia.train.train import train
 
 if __name__ == "__main__":
     train()

@@ -32,16 +32,16 @@ import transformers
 
 from transformers.trainer_pt_utils import LabelSmoother
 from torch.utils.data import Dataset
-from ming.conversations import get_default_conv_template
+from taia.conversations import get_default_conv_template
 
-from ming.model.utils import get_mixoflora_model
+from taia.model.utils import get_mixoflora_model
 import warnings
 from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer
-from ming.train.trainer import TAIATrainer
+from taia.train.trainer import TAIATrainer
 from peft import LoraConfig, get_peft_model
 import peft 
 
-from ming.model.builder import get_model_class_from_path
+from taia.model.builder import get_model_class_from_path
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 local_rank = None
 

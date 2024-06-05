@@ -4,8 +4,8 @@ from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
 import argparse
 import os 
 import torch
-from ming.model.builder import load_molora_pretrained_model
-from ming.utils import disable_torch_init, get_model_name_from_path
+from taia.model.builder import load_molora_pretrained_model
+from taia.utils import disable_torch_init, get_model_name_from_path
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
 def convert_to_automodel(model_path, model_base, load_8bit=False, load_4bit=False, use_logit_bias=False, device_map="auto", device="cuda", save_path=None):
     disable_torch_init()

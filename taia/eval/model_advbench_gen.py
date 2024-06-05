@@ -1,20 +1,17 @@
 import argparse
 import torch
 import os
-
+import json
 from tqdm import tqdm
-# import shortuuid
-from ming.utils import client
 
-from ming.conversations import conv_templates, SeparatorStyle
-from ming.model.builder import load_pretrained_model, load_molora_pretrained_model
-from ming.utils import get_model_name_from_path
-# from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
-from torch.utils.data import DataLoader
+from taia.conversations import conv_templates, SeparatorStyle
+from taia.model.builder import load_pretrained_model, load_molora_pretrained_model
+from taia.utils import  get_model_name_from_path
 
-import datasets 
-from copy import deepcopy
+from torch.utils.data import  DataLoader
+import pandas as pd 
 
+# from PIL import Image
 import math
 
 
@@ -89,7 +86,6 @@ def eval_model(args):
     # disable_torch_init()
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
-    test_base = model_path is None and args.model_base is not None 
     # else:
     if args.load_molora:
     # if "molora" in model_path:
@@ -97,30 +93,61 @@ def eval_model(args):
     else:
         tokenizer, model, context_len, tokenizer_with_prefix_space = load_pretrained_model(model_path, args.model_base, model_name, use_logit_bias=args.use_logit_bias, unload_ffn=args.unload_ffn)
 
-    # load args.question_file, which is a csv file
-    
-    
 
+    # load args.question_file, which is a csv file
+    if args.question_file.endswith(".csv"):
+        questions = pd.read_csv(args.question_file)
+        questions = convert_to_json(questions)
+    elif args.question_file.endswith(".jsonl"):
+        questions = [json.loads(q) for q in open(os.path.expanduser(args.question_file), "r")]
+    else:
+        with open(args.question_file, 'r') as f:
+            questions = json.load(f)
+    questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
     answers_file = os.path.expanduser(args.answers_file)
+    # os.makedirs(os.path.dirname(answers_file), exist_ok=True)
+    
+    if args.resume:
+        current_file_num = 0
+        # if client.exists(answers_file):
+        if os.path.exists(answers_file):
+            # data = client.read_jsonl(answers_file)
+            # current_file_num = len(data)
+            with open(answers_file, 'r') as f:
+                for line in f:
+                    current_file_num += 1
+            questions = questions[current_file_num:]
+            ans_file = open(answers_file, "a", encoding='utf-8')
+        else:
+            ans_file = open(answers_file, "w", encoding='utf-8')
+    else:
+        ans_file = open(answers_file, "w", encoding='utf-8')
 
     if 'plain' in model_name and 'finetune' not in model_name.lower() and 'mmtag' not in args.conv_mode:
         args.conv_mode = args.conv_mode + '_mmtag'
         print(f'It seems that this is a plain model, but it is not using a mmtag prompt, auto switching to {args.conv_mode}.')
-
+    print(ans_file, answers_file)
     # data_loader = create_data_loader(questions, tokenizer, model.config)
     model: torch.nn.Module
     model.eval()
     sequence_bias = None
     def get_tokens_as_tuple(word):
         return tuple(tokenizer_with_prefix_space([word], add_special_tokens=False).input_ids[0])
-
+    # for name, layer in model.named_modules():
+    #     layer.__name__ = name
+    #     if "gate_proj" in name:
+    #         layer.register_forward_hook(
+    #             lambda layer, input, output: print(f"{layer.__name__}: {input[0].shape} {output.shape}")
+    #         )
+    #         # print(f"register {layer.__name__} hook")
+    #         break
     max_new_tokens = args.max_tokens
     
-    dataset = datasets.load_dataset("tatsu-lab/alpaca_eval", "alpaca_eval")["eval"]
+    # dataset = datasets.load_dataset("tatsu-lab/alpaca_eval", "alpaca_eval")["eval"]
+    
     new_dataset = []
-    for example in tqdm(dataset):
-
-        cur_prompt = example['instruction']
+    for example in tqdm(questions, total=len(questions)):
+        cur_prompt = example['prompt']
         
 
         conv = conv_templates[args.conv_mode].copy()
@@ -166,12 +193,25 @@ def eval_model(args):
             outputs = outputs[:-len(stop_str)]
         outputs = outputs.strip()
         
-        new_example = deepcopy(example)
-        new_example['output'] = outputs
-        new_dataset.append(new_example)
+        ans_file.write(json.dumps({"prompt": cur_prompt, "answer": outputs}, ensure_ascii=False) + "\n",)
+        ans_file.flush()
+        # ans_id = shortuuid.uuid()
+        # ans_file.write(json.dumps({"prompt": cur_prompt,
+        #                            "text": outputs,
+        #                            "solution": answer,
+        #                            "additional_info": additional_info,
+        #                            "model_id": model_name,
+        #                            "metadata": {}}, ensure_ascii=False) + "\n",)
+        # ans_file.flush()
 
+        
+    ans_file.close()
+    # with open(os.path.expanduser(args.answers_file), 'r') as f:
+    #     client.write_jsonl([x for x in f], args.s3_answers_file)
+    # if not args.keep_local:
+    #     os.remove(os.path.expanduser(args.answers_file))
 
-    client.write(new_dataset, answers_file)
+    # client.write(new_dataset, answers_file)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -182,7 +222,6 @@ if __name__ == "__main__":
     parser.add_argument("--question-file", type=str, default="tables/question.jsonl")
     parser.add_argument("--answers-file", type=str, default="answer.jsonl")
     parser.add_argument("--s3-answers-file", type=str, default="s3://syj_test/answer.jsonl")
-    parser.add_argument("--keep-local", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--use-logit-bias", action='store_true')
     parser.add_argument("--logit-score", default=15.0)

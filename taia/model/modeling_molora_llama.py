@@ -1,7 +1,7 @@
 from math import isnan
 from transformers.models.llama.configuration_llama import LlamaConfig
 
-from ming.model.modeling_molora_qwen import MoLoRAQwenDecoderLayer
+from taia.model.modeling_molora_qwen import MoLoRAQwenDecoderLayer
 from .utils import MoLoRALinear
 
 from transformers.models.llama.modeling_llama import LlamaMLP, LlamaDecoderLayer, LlamaForCausalLM, LlamaModel
