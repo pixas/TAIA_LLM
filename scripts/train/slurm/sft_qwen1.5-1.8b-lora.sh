@@ -40,7 +40,7 @@ srun --jobid $SLURM_JOBID python -u -m torch.distributed.run \
     --rdzv_id $MASTER_PORT --rdzv_backend c10d --rdzv_endpoint $head_node_ip:$MASTER_PORT \
     --rdzv_backend c10d \
     --node_rank $SLURM_PROCID \
-    ming/train/train_mem.py \
+    taia/train/train_mem.py \
     --lora_enable --lora_r 16 --lora_alpha 32 \
     --deepspeed scripts/zero3.json \
     --model_name_or_path $MODEL_PATH \

@@ -21,7 +21,7 @@ echo "Processing $domain"
 mkdir -p ${LOGS_BASE_PATH}/${domain}
 
 # 执行 infer 命令
-srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.infer.log python -m ming.eval.model_advbench_gen \
+srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.infer.log python -m taia.eval.model_advbench_gen \
     --model-base ${MODEL_BASE} \
     --model-path ${MODEL_PATH} \
     --answers-file ${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.jsonl \
@@ -40,4 +40,4 @@ wait
 
 echo "Evaluating $domain"
 
-srun -p partition python -m ming.eval.eval_advbench --input_file ${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.jsonl
+srun -p partition python -m taia.eval.eval_advbench --input_file ${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.jsonl

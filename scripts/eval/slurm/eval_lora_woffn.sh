@@ -14,7 +14,7 @@ domain="math"
 
 echo "Processing $domain"
 mkdir -p ${LOGS_BASE_PATH}/${domain}
-srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${domain}/${CKPT}.infer.log python -m ming.eval.model_diverse_gen \
+srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${domain}/${CKPT}.infer.log python -m taia.eval.model_diverse_gen \
     --model-path ${MODEL_PATH} \
     --model-base ${MODEL_BASE} \
     --question-file datas/eval/${domain}.json \
@@ -29,7 +29,7 @@ srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${do
     --resume
 
 echo "Evaluating $domain"
-srun -p partition --output=${LOGS_BASE_PATH}/${domain}/${CKPT}.eval.log python -m ming.eval.eval_em \
+srun -p partition --output=${LOGS_BASE_PATH}/${domain}/${CKPT}.eval.log python -m taia.eval.eval_em \
     --input_file ${LOGS_BASE_PATH}/${domain}/${CKPT}.jsonl 
 
 wait

@@ -12,7 +12,7 @@ dist
 
 # Data
 !**/alpaca-data-conversation.json
-!ming/eval/datasets/*.jsonl
+!taia/eval/datasets/*.jsonl
 datas
 # Editor
 .idea
