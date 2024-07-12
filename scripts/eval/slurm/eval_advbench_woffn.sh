@@ -26,7 +26,7 @@ srun -p partition --gres=gpu:1  --quotatype=auto --output=${LOGS_BASE_PATH}/${do
     --model-path ${MODEL_PATH} \
     --answers-file ${LOGS_BASE_PATH}/${domain}/${CKPT}${version}.jsonl \
     --s3-answers-file s3://syj_test/logs/diverse/${domain}/${CKPT}${version}.jsonl \
-    --question-file /mnt/petrelfs/jiangshuyang.p/datasets/harmful_behaviors.csv \
+    --question-file /mnt/petrelfs/user/datasets/harmful_behaviors.csv \
     --temperature 0 \
     --max-tokens 1024 \
     --keep-local \

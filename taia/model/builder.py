@@ -75,10 +75,10 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
         tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False, trust_remote_code=True)
         if unload_ffn:
             if "1.8b" in model_path:
-                pretrained_path = "/mnt/petrelfs/jiangshuyang.p/models/models--Qwen--Qwen1.5-1.8B-Chat"
+                pretrained_path = "/mnt/petrelfs/user/models/models--Qwen--Qwen1.5-1.8B-Chat"
             elif "7b" in model_path:
                 if "ming" in model_path or "qwen" in model_path:
-                    pretrained_path = "/mnt/petrelfs/jiangshuyang.p/models/models--Qwen--Qwen1.5-7B-Chat"
+                    pretrained_path = "/mnt/petrelfs/user/models/models--Qwen--Qwen1.5-7B-Chat"
                 else:
                     pass
             elif "8b" in model_path:

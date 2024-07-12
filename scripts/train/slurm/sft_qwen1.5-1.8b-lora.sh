@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J sft_qwen
-#SBATCH --partition=partition
+#SBATCH --partition=medai_llm
 #SBATCH -N1
 #SBATCH --quotatype=spot
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=1    
 #SBATCH --mem-per-cpu=16G  
@@ -16,7 +16,7 @@ nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun -N1 -n1 -w "$head_node" hostname --ip-address)
 
-GPUS_PER_NODE=4
+GPUS_PER_NODE=2
 NNODES=$SLURM_NNODES
 
 echo Node IP: $head_node_ip nodes_array: $nodes_array
