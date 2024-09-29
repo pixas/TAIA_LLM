@@ -1,5 +1,5 @@
 # TAIA: Large Language Models are Out-of-Distribution Data Learners
-This is the repository for NeurIPS 2024 Poster: "TAIA: Large Language Models are Out-of-distribution Data Learners"
+
 <p align = "center">
 <img src="img/taia.png" width="95%" alt="" align=center />
 </p>
@@ -7,9 +7,14 @@ This is the repository for NeurIPS 2024 Poster: "TAIA: Large Language Models are
 The comparison of TAIA with vanilla fine-tuning method on OOD data.
 </p>
 
+## News
+🔥 [2024/09/26] Our paper is accepted by NeurIPS 2024 Poster!
+* This is the repo for [TAIA: Large Language Models are Out-of-Distribution Data Learners](https://arxiv.org/pdf/2405.20192)
+
 
 ## Contents
 - [TAIA: Large Language Models are Out-of-Distribution Data Learners](#taia-large-language-models-are-out-of-distribution-data-learners)
+  - [News](#news)
   - [Contents](#contents)
   - [Highlights](#highlights)
   - [Setups](#setups)
