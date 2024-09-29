@@ -12,12 +12,12 @@ from functools import wraps
 def proxy_decorator(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        ori_http_proxy = os.environ.get('http_proxy')  # 获取原始的http_proxy值
+        ori_http_proxy = os.environ.get('http_proxy')  
         ori_https_proxy = os.environ.get("https_proxy")
-        os.environ['http_proxy'] = ''  # 在函数执行前将http_proxy设为空字符串
+        os.environ['http_proxy'] = ''  
         os.environ['https_proxy'] = ''
-        result = func(*args, **kwargs)  # 执行函数
-        os.environ['http_proxy'] = ori_http_proxy if ori_http_proxy is not None else ''  # 函数执行后恢复原始的http_proxy值
+        result = func(*args, **kwargs)  
+        os.environ['http_proxy'] = ori_http_proxy if ori_http_proxy is not None else ''  
         os.environ['https_proxy'] = ori_https_proxy if ori_https_proxy is not None else ''
         return result
     return wrapper

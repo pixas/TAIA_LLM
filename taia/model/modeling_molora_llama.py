@@ -19,15 +19,14 @@ from copy import deepcopy
 
 logger = logging.get_logger(__name__)
 def calc_attention_fluctuation(attention_maps: torch.Tensor, consider_trace=True) -> torch.Tensor:
-    # L: 层数, N: 序列长度
+    # L: layer number, N: sequence length
     bs, heads, m, N = attention_maps.shape
     attention_maps = attention_maps.squeeze(0)  # (h, m, N)
     # assert attention_maps.shape == (heads, m, N)
     normalized_attention_maps = attention_maps.to(torch.float32)
-    # 计算熵，使用广播避免显式循环
     entropy = -(normalized_attention_maps * torch.log2(normalized_attention_maps + 1e-9)).sum(dim=-1)  # (h, m)
     # assert torch.isnan(entropy).sum() == 0
-    # 生成权重
+    # obtain weights
     if consider_trace:
         if m > 1:
             # process input
@@ -38,7 +37,7 @@ def calc_attention_fluctuation(attention_maps: torch.Tensor, consider_trace=True
     else:
         weights = torch.arange(0, N, dtype=torch.float32).to(attention_maps.device)
     
-    # 计算加权平均的熵
+
     if isinstance(weights, torch.Tensor):
         layer_weighted_entropy = (entropy * weights).sum(dim=-1) / weights.sum()  # (h)
     else:

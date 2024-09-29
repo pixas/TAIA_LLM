@@ -1,6 +1,0 @@
-You are an expert in math. Below are a math question and its reference answer. Refer to the reference answer and write a response that appropriately answers the question. 
-
-{instruction} 
-
-{original_response} 
-Great! Let’s think step by step.

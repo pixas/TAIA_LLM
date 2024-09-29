@@ -229,7 +229,6 @@ def load_molora_pretrained_model(model_path, model_base, model_name, load_molora
 
 
         print('Convert to FP16...')
-        print(model)
         model.to(torch.float16)
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False, trust_remote_code=True)

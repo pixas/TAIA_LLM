@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -J sft_qwen
-#SBATCH --partition=medai_llm
+#SBATCH --partition=partition_name
 #SBATCH -N1
 #SBATCH --quotatype=spot
 #SBATCH --gres=gpu:2
@@ -20,7 +20,7 @@ GPUS_PER_NODE=2
 NNODES=$SLURM_NNODES
 
 echo Node IP: $head_node_ip nodes_array: $nodes_array
-srun bash -c 'echo $SLURMD_NODENAME-$SLURM_JOB_GPUS' # 打印出不同机器上分配的显卡编号
+srun bash -c 'echo $SLURMD_NODENAME-$SLURM_JOB_GPUS' 
 
 export LOGLEVEL=INFO
 # export NCCL_SOCKET_IFNAME="eth0"
