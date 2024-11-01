@@ -15,9 +15,25 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd 
 from taia.utils import client
 from copy import deepcopy
+from transformers.generation.logits_process import LogitsProcessor, LogitsProcessorList
 # from PIL import Image
 import math
 
+
+    
+class LogitBiasProcess(LogitsProcessor):
+    def __init__(self, activate_token_list: list[int] = None, activate_scale=100):
+        self.activate_token_list = activate_token_list
+        self.activate_scale=activate_scale
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        # logger.info(scores.shape, input_ids.shape)
+        for id_ in self.activate_token_list:
+            if scores.dim() == 2:
+                scores[:, id_] += self.activate_scale
+            else:
+                scores[id_] += self.activate_scale
+        return scores
 
 def split_list(lst, n):
     """Split a list into n (roughly) equal-sized chunks"""
@@ -183,9 +199,9 @@ def convert_to_json(questions):
 
     # pass
 
-four_choices_datasets = ["logiqa_en_cot", "mmedbench_en_cot", "mmlu_cot", "sat_math_cot", "mmlu_math_cot", "mmedbench_zh_cot", "medmcqa_cot", 'logiqa_en_prompt_cot', "mmedbench_en_prompt_cot", "mmlu_prompt_cot", 'med_mmlu_cot']
-five_choices_datasets = ['commonsense_qa_cot', "CMExam_zh_cot", "medqa_cot", 'commonsense_qa_prompt_cot', "MedQA_cot"]
-three_choices_datasets = ['pubmedqa_cot', 'pubmedqa_c_cot']
+four_choices_datasets = ["logiqa_en", "mmedbench_en", "mmlu", "sat_math", "mmlu_math", "mmedbench_zh", "medmcqa", 'logiqa_en_prompt', "mmedbench_en_prompt", "mmlu_prompt", 'med_mmlu']
+five_choices_datasets = ['commonsense_qa', "CMExam_zh", "medqa", 'commonsense_qa_prompt', "MedQA"]
+three_choices_datasets = ['pubmedqa', 'pubmedqa_c']
 
 def eval_model(args):
     # Model
@@ -215,8 +231,6 @@ def eval_model(args):
     
     
     sequence_bias = None
-    def get_tokens_as_tuple(word):
-        return tuple(tokenizer_with_prefix_space([word], add_special_tokens=False).input_ids[0])
 
     task_specific_prompt = ""
     
@@ -232,25 +246,13 @@ def eval_model(args):
     elif dataset_name == 'math' or dataset_name == 'math_500':
         task_specific_prompt = "\n\nPlease format the final answer at the end of the response as:  The answer is {answer}."
 
-    elif dataset_name in ["winogrande"]:
-        sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B"]}
-        max_new_tokens = 2 if test_base else 1 
-        if test_base and args.conv_mode == 'llama3':
-            max_new_tokens = 3
-        task_specific_prompt = "\n\nPlease answer with option letter directly, do not output other infomation."
 
     elif dataset_name in ["race_high", "race_middle", "mmedbench_en", "mmlu", "arc"]:
-        sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-        max_new_tokens = 2 if test_base else 1 
-        if test_base and args.conv_mode == 'llama3':
-            max_new_tokens = 3
+
         task_specific_prompt = "\n\nPlease answer with option letter directly, do not output other infomation."
 
     elif dataset_name in ["mmedbench_zh", "ceval", "cmmlu"]:
-        sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-        max_new_tokens = 2 if test_base else 1 
-        if test_base and args.conv_mode == 'llama3':
-            max_new_tokens = 3
+
         task_specific_prompt = "\n\n请用选项的字母直接回答，不要输出其他信息："
 
     elif dataset_name == "humaneval":
@@ -258,15 +260,13 @@ def eval_model(args):
 
     elif dataset_name == "logiqa_en":
         if test_base or args.conv_mode == 'qwen':
-            sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-            max_new_tokens = 1 if test_base else 1 
+            
             task_specific_prompt = "\n\nPlease answer with option letter directly, do not output other infomation."
         else:
             task_specific_prompt = "\n\nPlease think step by step and give your answer in the end."
             
     elif dataset_name == "logiqa_zh":
-        sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-        max_new_tokens = 1 if args.conv_mode != "llama2" else 1 
+
         task_specific_prompt = "\n\n请用选项的字母直接回答，不要输出其他信息："
 
     elif dataset_name == "commonsense_qa":
@@ -359,9 +359,6 @@ def eval_model(args):
             print(f'[Warning] {n_diff_input_output} output_ids are not the same as the input_ids')
         # print("original outputs: ",tokenizer.batch_decode(output_ids[:, :], skip_special_tokens=True) )
         outputs = tokenizer.batch_decode(output_ids[:, input_token_len:], skip_special_tokens=True)
-        # print("cut outputs: ", outputs)
-        
-        # print("[FIRST OUTPUT]: ", outputs)
 
         if args.infer_answer:
             if "zh" in prompts[0]:
@@ -377,61 +374,50 @@ def eval_model(args):
             attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device='cuda', non_blocking=True)
             if args.conv_mode == 'chatglm3' or args.conv_mode == 'chatglm2':
                 attention_mask = attention_mask.to(torch.float)
-            # if dataset_name not in ["CMExam_cot", "PLE_TCM_cot", "PLE_Pharmacy_cot", "bbh_cot"]:
-            #     if "E." in prompts[0] or "(E)" in prompts[0]:
-            #         cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D", "E"]}
-            #     else:
-            #         cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-            #     cot_max_new_tokens = 1
+
+            def add_choice_words(choices_word):
+                choice_ids = [tokenizer.encode(x)[0] for x in choices_word]
+                return choice_ids
+            choices_word = None
             if dataset_name in four_choices_datasets:
-                cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-                cot_max_new_tokens = 1
+                choices_word = ["A", "B", "C", "D"]
+
             elif dataset_name in five_choices_datasets:
-                cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D", "E"]}
-                cot_max_new_tokens = 1
+                choices_word = ["A", "B", "C", "D", "E"]
+
             elif dataset_name in three_choices_datasets:
-                cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C"]}
-                cot_max_new_tokens = 1
-            elif dataset_name in ['winogrande_cot']:
-                cot_sequence_bias = {get_tokens_as_tuple(x): 100.0 for x in ["A", "B"]}
-                cot_max_new_tokens = 1
-            elif dataset_name in ["CMExam_cot", "CMB_cot", "cmmlu_cot", "ceval_cot", "medqa_mainland_cot", "MedMCQA_cot"]:
-                if "E." in prompts[0] or "(E)" in prompts[0]:
-                    cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D", "E"]}
-                else:
-                    cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in ["A", "B", "C", "D"]}
-                cot_max_new_tokens = 1
-            elif dataset_name in ['truthfulqa_mc1_cot']:
-                if "num_choices" in additional_infos[0]:
-                    num_choices = additional_infos[0]['num_choices']
-                    choice_idx = "ABCDEFGHIJKLMNOPQSTUVWXYZ"[:num_choices]
-                    cot_sequence_bias = {get_tokens_as_tuple(x): args.logit_score for x in list(choice_idx)}
-                    cot_max_new_tokens = 1
+                choices_word = ['A', 'B', 'C']
             else:
-                cot_sequence_bias = None
+                raise NotImplementedError
+            
+            if choices_word is not None:
+                logits_processor = LogitsProcessorList()
+                logits_processor.append(LogitBiasProcess(add_choice_words(choices_word), activate_scale=args.logit_score))
+                cot_max_new_tokens = 1
+            else:
+                logits_processor = None
                 cot_max_new_tokens = 50
 
             with torch.inference_mode():
                 answer_output_ids = model.generate(
-                input_ids,
-                attention_mask=attention_mask,
-                do_sample=True if args.temperature > 0 else False,
-                temperature=args.temperature,
-                top_p=args.top_p,
-                num_beams=args.num_beams,
-                max_new_tokens=cot_max_new_tokens,
-                eos_token_id=terminators,
-                pad_token_id=tokenizer.pad_token_id,
-                sequence_bias=cot_sequence_bias,
-                use_cache=True)
+                    input_ids,
+                    attention_mask=attention_mask,
+                    do_sample=True if args.temperature > 0 else False,
+                    temperature=args.temperature,
+                    top_p=args.top_p,
+                    num_beams=args.num_beams,
+                    max_new_tokens=cot_max_new_tokens,
+                    eos_token_id=terminators,
+                    pad_token_id=tokenizer.pad_token_id,
+                    logits_processor=logits_processor,
+                    use_cache=True
+                )
 
             input_token_len = input_ids.shape[1]
             n_diff_input_output = (input_ids != answer_output_ids[:, :input_token_len]).sum().item()
             if n_diff_input_output > 0:
                 print(f'[Warning] {n_diff_input_output} output_ids are not the same as the input_ids')
-            # print("all: ", tokenizer.batch_decode(answer_output_ids, skip_special_tokens=True))
-            # print("input: ", cot_prompts)
-            # print("all: ", tokenizer.batch_decode(answer_output_ids[:, :], skip_special_tokens=True))
+           
             answer_outputs = tokenizer.batch_decode(answer_output_ids[:, input_token_len:], skip_special_tokens=True)
             # print(answer_outputs)
             outputs = [f"{output}{' ' if output.strip().endswith('.') else '. '}{cot_prompt}{answer_output}" for output, answer_output in zip(outputs, answer_outputs)]
